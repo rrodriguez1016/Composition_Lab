@@ -1,6 +1,6 @@
-// Rene Rodriguez 09/26/25  
-// Lab Activities: Inheritance
-// Challenge: Specialized Bank Accounts
+// Rene Rodriguez 09/27/25  
+// Lab Activities: Inheritance & Composition
+// Challenge: Logging Transactions
 
 #include<iostream>
 #include<vector>
@@ -8,6 +8,11 @@
 #include<limits>
 #include<stdexcept>
 #include<cmath>
+#include<chrono>
+#include<ctime>
+#include <iomanip>
+#include <sstream>
+#include<format>
 using namespace std;
 
 // Global variables used for user input
@@ -16,7 +21,15 @@ int userInt;
 string userString;
 
 // ================= Utility Functions =================
-
+//Helper function to get current time
+string getTime(){
+    auto now_tp = chrono::system_clock::now();
+    time_t now_time_tp = chrono::system_clock::to_time_t(now_tp);
+    tm* local_tm = localtime(&now_time_tp);
+    ostringstream oss;
+    oss << put_time(local_tm, "%Y-%m-%d %H:%M:%S");
+    return oss.str();
+}
 // Helper function for validated integer input
 int getIntInput(){
     int input;
@@ -35,6 +48,41 @@ int getIntInput(){
     cout << "You entered " << input << endl;
     return input;
 }
+// ================= Transaction Class =================
+
+class Transaction
+{
+private:
+    /* data */
+public:
+    Transaction(string type, double amount, string timestamp);
+    ~Transaction();
+    string type;
+    double amount;
+    string timestamp;
+    string GetType(){
+        return type;
+    };
+    double GetAmount(){
+        return amount;
+    };
+    string GetTime(){
+        return timestamp;
+    }
+
+};
+
+Transaction::Transaction(string type, double amount, string timestamp)
+{
+    this->type = type;
+    this->amount = amount;
+    this->timestamp = timestamp;
+}
+
+Transaction::~Transaction()
+{
+}
+
 
 // ================= BankAccount Class =================
 class BankAccount {
@@ -85,16 +133,33 @@ class BankAccount {
         void SetAccHolder(string holderName);
         void Deposit(double depositAmount);
         virtual bool Withdraw(double withdrawAmount);
+        void printHistory() const;
     
     protected:
         double balance;
         string accountNumber;
         string accountHolderName;
+        //Changed the vector to be protected instead of private so that the subclasses could interact with it as well
+        vector<Transaction> transactionHistory;
     private:
 };
 
 // ================= BankAccount Definitions =================
-
+//loops through vector and prints transaction info
+void BankAccount::printHistory() const{
+    if(transactionHistory.size() == 0){
+        cout << "No Transaction History" << endl;
+    } else {
+        cout << "Transaction History: " << endl;
+        for (const auto& tx : transactionHistory) {
+            cout << "{" << endl;
+            cout << "Type: "   << tx.type << endl
+                 << "Amount: " << tx.amount << endl
+                 << "Time: "   << tx.timestamp   << endl;
+            cout << "}" << endl;
+        }
+    }
+}
 // Copy constructor (performs deep copy of members)
 BankAccount::BankAccount(const BankAccount& other) 
     : accountHolderName(other.accountHolderName),
@@ -110,6 +175,9 @@ BankAccount& BankAccount::operator+=(double amount){
         throw invalid_argument("Cannot add a non-positive amount.");
     }
     this->balance += amount;
+    //Had implement it here because my function implements this to deposit rather than BankAccount::Depost()
+    Transaction newTransaction("Deposit", amount, getTime());
+    transactionHistory.push_back(newTransaction);
     return *this;
 }
 
@@ -130,6 +198,9 @@ void BankAccount::printAccount(const BankAccount& account){
     cout << "Account Number: " << account.GetAccNum() << endl
          << "Account Holder Name: " << account.GetAccHolder() << endl
          << "Account Balance: " << account.GetBalance() << endl;
+         //I called printHistory here so that users could see transaction history whenever they list the accounts
+         account.printHistory();
+         
 }
 
 // Create new account by prompting user for input
@@ -174,7 +245,9 @@ string BankAccount::GetAccNum() const { return accountNumber; }
 string BankAccount::GetAccHolder() const { return accountHolderName; }
 double BankAccount::GetBalance() const { return balance; }
 void BankAccount::SetAccHolder(string holderName){ accountHolderName = holderName; }
-void BankAccount::Deposit(double depositAmount){ balance += depositAmount; }
+void BankAccount::Deposit(double depositAmount){
+    balance += depositAmount;
+}
 bool BankAccount::Withdraw(double withdrawAmount){
     if (withdrawAmount > balance){
         cout << "Insufficient funds." << endl;
@@ -211,6 +284,9 @@ bool CheckingAccount::Withdraw(double withdrawAmount){
         return true;
     } else {
         balance -= (floor((withdrawAmount + (withdrawAmount / 100)) * 100.0) / 100.0);
+        //Had to make sure checking accounts created a transaction object when users withdraw from it
+        Transaction newTransaction("Withdrawal", floor((withdrawAmount + (withdrawAmount / 100)) * 100.0) / 100.0, getTime());
+        transactionHistory.push_back(newTransaction);
         return false;
     }
 }
